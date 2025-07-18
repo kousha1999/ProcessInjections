@@ -98,6 +98,9 @@ int main(int argc, char* argv[]) {
 		CloseHandle(hRsrc);
 	if(hLoadRsrc)
 		CloseHandle(hLoadRsrc);
+
+	VirtualFree(lpAddress, NULL, MEM_RELEASE);
+
 	if (hThread)
 		CloseHandle(hThread);
 	if (hProc)
